@@ -1,6 +1,3 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
-
 name: Java CI with Maven
 
 on: [ push ]
@@ -49,7 +46,6 @@ jobs:
             echo $MAJOR_NUM.$NEW_MINOR_NUM.$PATCH_NUM-build.$(git rev-parse --short HEAD)
           }
 
-          # Fetch git tags with versions different than hotfix, ignore grep not match as a part of logic related with version initialisation
           set +e
           PREV_VERSION=$(git tag | grep -E '.*[^hotfix]$' | tail -n 1)
           set -e
@@ -80,6 +76,7 @@ jobs:
           echo 'New version:' $RELEASE_VERSION
       - id: version-output-step
         run: echo "::set-output name=version-output::$(cat version.txt)"
+
   build:
     runs-on: ubuntu-latest
     needs: calculate-version
@@ -98,11 +95,12 @@ jobs:
       - name: Build with Maven
         run: mvn verify
       - name: Upload JAR file
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: app
           path: target/*.jar
           retention-days: 10
+
   docker:
     runs-on: ubuntu-latest
     needs: [calculate-version, build]
@@ -115,22 +113,23 @@ jobs:
         with:
           driver-opts: network=host
       - name: Download JAR file
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: app
           path: target/
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
-      - name: Build and push to local registry
+      - name: Build and push to DockerHub
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: pbakpjatk/test-app:${{ needs.calculate-version.outputs.version }}
+          tags: s32215/test-app:${{ needs.calculate-version.outputs.version }}
+
   trigger-deploy:
     runs-on: ubuntu-latest
     needs: [ calculate-version, docker ]
